@@ -24,6 +24,8 @@ jobs:
             image: ghcr.io/${{ github.repository }}/ud-indexer
           - dockerfile: ./Dockerfile.producer
             image: ghcr.io/${{ github.repository }}/ud-producer
+          - dockerfile: ./Dockerfile.blackhole
+            image: ghcr.io/${{ github.repository }}/ud-blackhole
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

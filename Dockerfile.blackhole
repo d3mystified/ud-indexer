@@ -1,0 +1,20 @@
+FROM python:3.8-slim
+
+ARG SERVICE_NAME=ud-blackhole
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# Set working directory
+WORKDIR /app
+
+# Copy only the files needed for pip install to maximize cache utilization
+COPY requirements.txt ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application
+COPY blackhole.py .
+
+CMD ["python", "blackhole.py"]
