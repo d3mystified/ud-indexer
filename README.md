@@ -9,6 +9,11 @@ This will deploy 2 services:
 1. `ud-producer` is responsible for tracking nzbs into a SQLite DB. On startup it will scan all existing nzbs, as well as monitor FS events for newly created nzbs.
 2. `ud-indexer` is a web server that allows for searching and downloading of nzbs.
 
+Container images are also available to user:
+
+- `ghcr.io/d3mystified/ud-indexer/ud-producer:main`
+- `ghcr.io/d3mystified/ud-indexer/ud-indexer:main`
+
 ```
 ud-producer:
   container_name: ud-producer
@@ -105,7 +110,7 @@ search:
     title:
       selector: name
     category_is_tv_show:
-      text: "{{ .Result.name }}"
+      text: "{{ .Result.title }}"
       filters:
         - name: regexp
           args: "\\b(S\\d+(?:E\\d+)?)\\b"
