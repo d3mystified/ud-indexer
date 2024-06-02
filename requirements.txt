@@ -1,0 +1,7 @@
+flask
+gunicorn
+parse-torrent-title
+requests
+LordNzb
+themoviedb
+watchdog

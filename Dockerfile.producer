@@ -1,0 +1,21 @@
+FROM python:3.8-slim
+
+ARG SERVICE_NAME=ud-producer
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+ENV NZBS_DIR=/nzbs
+
+# Set working directory
+WORKDIR /app
+
+# Copy only the files needed for pip install to maximize cache utilization
+COPY requirements.txt ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application
+COPY producer.py .
+
+CMD ["python", "producer.py"]
