@@ -1,4 +1,5 @@
-from flask import Flask, jsonify, send_file, abort
+from datetime import datetime, timedelta
+from flask import Flask, send_file, abort, request, Response
 import logging
 import os
 import sqlite3
@@ -13,6 +14,7 @@ if __name__ != '__main__':
     app.logger.setLevel(gunicorn_logger.level)
 
 
+base_url = os.environ.get('INDEXER_BASE_URL')
 nzbs_root_dir = os.environ.get('NZBS_DIR')
 config_dir = "/config"
 db_name = "nzbs.db"
@@ -73,7 +75,7 @@ def search_shows_with_imdb(imdbid, seasonnum):
     app.logger.debug("Executing query %s", query)
     cursor.execute(query)
     rows = cursor.fetchall()
-    return jsonify({"results": rows_to_dicts(cursor, rows)})
+    return {"results": rows_to_dicts(cursor, rows)}
 
 
 @app.route("/search/movies/<imdbid>")
@@ -85,7 +87,7 @@ def search_movies_with_imdb(imdbid):
     app.logger.debug("Executing query %s", query)
     cursor.execute(query)
     rows = cursor.fetchall()
-    return jsonify({"results": rows_to_dicts(cursor, rows)})
+    return {"results": rows_to_dicts(cursor, rows)}
 
 
 # This is needed to make prowlarr tests happy
@@ -98,7 +100,7 @@ def search_shows_with_title_test():
     app.logger.debug("Executing query %s", query)
     cursor.execute(query)
     rows = cursor.fetchall()
-    return jsonify({"results": rows_to_dicts(cursor, rows)})
+    return {"results": rows_to_dicts(cursor, rows)}
 
 
 # This is needed to make prowlarr tests happy
@@ -111,7 +113,7 @@ def search_movies_with_title_test():
     app.logger.debug("Executing query %s", query)
     cursor.execute(query)
     rows = cursor.fetchall()
-    return jsonify({"results": rows_to_dicts(cursor, rows)})
+    return {"results": rows_to_dicts(cursor, rows)}
 
 
 @app.route("/search/shows/title/<title>")
@@ -123,7 +125,7 @@ def search_shows_with_title(title):
     app.logger.debug("Executing query %s", query)
     cursor.execute(query)
     rows = cursor.fetchall()
-    return jsonify({"results": rows_to_dicts(cursor, rows)})
+    return {"results": rows_to_dicts(cursor, rows)}
 
 
 @app.route("/search/movies/title/<title>")
@@ -135,7 +137,55 @@ def search_movies_with_title(title):
     app.logger.debug("Executing query %s", query)
     cursor.execute(query)
     rows = cursor.fetchall()
-    return jsonify({"results": rows_to_dicts(cursor, rows)})
+    return {"results": rows_to_dicts(cursor, rows)}
+
+
+@app.route("/api")
+def newznab_api():
+  function = request.args.get('t')
+
+  if function == "caps":
+    return Response("""<caps>
+      <server appversion="1.0.0" version="0.1" title="UDIndexer" strapline="" />
+      <limits max="100" default="100"/>
+      <registration available="no" open="no"/>
+      <searching>
+        <search available="yes" supportedParams="q"/>
+        <tv-search available="yes" supportedParams="q,imdbid,season"/>
+        <movie-search available="yes" supportedParams="q,imdbid"/>
+      </searching>
+      <categories>
+        <category id="2000" name="Movies"></category>
+        <category id="5000" name="TV"></category>
+      </categories>
+      <genres>
+        <genre id="2" categoryid="2000" name="All"/>
+        <genre id="5" categoryid="5000" name="All"/>
+      </genres>
+    </caps>""", mimetype='application/xml')
+
+  if function == "tvsearch":
+    imdb_id = request.args.get('imdbid')
+    season = request.args.get('season')
+    results = search_shows_with_imdb("tt" + imdb_id, season)
+    return Response(construct_xml(results['results'], 5000), mimetype='application/xml')
+
+  if function == "movie":
+    imdb_id = request.args.get('imdbid')
+    results = search_movies_with_imdb("tt" + imdb_id)
+    return Response(construct_xml(results['results'], 2000), mimetype='application/xml')
+
+  if function == "search":
+    q = request.args.get('q')
+    cats = request.args.get('cat')
+    if cats and 2000 in cats:
+      results = search_movies_with_title(q)
+      return Response(construct_xml(results['results'], 2000), mimetype='application/xml')
+    if cats and 5000 in cats:
+      results = search_shows_with_title(q)
+      return Response(construct_xml(results['results'], 5000), mimetype='application/xml')
+
+    return Response(construct_xml(search_movies_with_title_test()['results'], 2000), mimetype='application/xml')
 
 
 def rows_to_dicts(cursor, rows):
@@ -145,6 +195,37 @@ def rows_to_dicts(cursor, rows):
     # Zip column names and row values to create a dictionary
     data.append(dict(zip(column_names, row)))
   return data
+
+
+def fake_dt():
+  now = datetime.now()
+  one_hour_ago = now - timedelta(hours=1)
+  return one_hour_ago.strftime('%a, %d %b %Y %H:%M:%S %z')
+
+def construct_xml(rows_dicts, cat):
+  pre = """<?xml version="1.0" encoding="UTF-8"?>
+  <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:newznab="http://www.newznab.com/DTD/2010/feeds/attributes/" encoding="utf-8">
+  <channel><newznab:response offset="0" total="100"/><newznab:apilimits apiCurrent="0" grabCurrent="0"/>"""
+  post = """</channel></rss>"""
+  items = ""
+  for row in rows_dicts:
+    item_xml = "<item>"
+    item_xml += f"<title>{row['name']}</title>"
+    # TODO: replace with an env var
+    item_xml += f"<link>{base_url}/download/{row['filename']}</link>"
+    item_xml += f'<enclosure url=\"{base_url}/download/{row["filename"]}\" length=\"{row["raw_size"]}\" type=\"application/x-nzb\"/>'
+    item_xml += f"<pubDate>{fake_dt()}</pubDate>"
+    item_xml += f'<newznab:attr name=\"category\" value=\"{cat}\"/>'
+    item_xml += f'<newznab:attr name=\"size\" value=\"{row["raw_size"]}\"/>'
+    item_xml += f'<newznab:attr name=\"files\" value=\"1\"/>'
+    item_xml += f'<newznab:attr name=\"title\" value=\"\"/>'
+    if cat == 5000:
+      item_xml += f'<newznab:attr name=\"season\" value=\"{row["season"]}\"/>'
+      item_xml += f'<newznab:attr name=\"episode\" value=\"{row["episode"]}\"/>'
+    item_xml += "</item>"
+    items += item_xml
+
+  return f"{pre}{items}{post}"
 
 
 if __name__ == '__main__':
