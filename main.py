@@ -151,7 +151,7 @@ def newznab_api():
       <registration available="no" open="no"/>
       <searching>
         <search available="yes" supportedParams="q"/>
-        <tv-search available="yes" supportedParams="q,imdbid,season"/>
+        <tv-search available="yes" supportedParams="q,imdbid,season,ep"/>
         <movie-search available="yes" supportedParams="q,imdbid"/>
       </searching>
       <categories>
@@ -178,14 +178,16 @@ def newznab_api():
   if function == "search":
     q = request.args.get('q')
     cats = request.args.get('cat')
-    if cats and '2000' in cats and q:
-      results = search_movies_with_title(q)
-      return Response(construct_xml(results['results'], 2000), mimetype='application/xml')
-    if cats and '5000' in cats and q:
-      results = search_shows_with_title(q)
-      return Response(construct_xml(results['results'], 5000), mimetype='application/xml')
-
-    return Response(construct_xml(search_movies_with_title_test()['results'], 2000), mimetype='application/xml')
+    if cats and '2000' in cats:
+      if q:
+        results = search_movies_with_title(q)
+        return Response(construct_xml(results['results'], 2000), mimetype='application/xml')
+      return Response(construct_xml(search_movies_with_title_test()['results'], 2000), mimetype='application/xml')
+    if cats and '5000' in cats:
+      if q:
+        results = search_shows_with_title(q)
+        return Response(construct_xml(results['results'], 5000), mimetype='application/xml')
+      return Response(construct_xml(search_shows_with_title_test()['results'], 5000), mimetype='application/xml')
 
 
 def rows_to_dicts(cursor, rows):
