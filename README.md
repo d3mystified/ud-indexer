@@ -4,7 +4,7 @@ A Prowlarr indexer for Usenet Drive nzbs.
 
 ## How it works
 
-There are four components that make up this indexer:
+There are three components that make up this indexer:
 
 ### `ud-producer`
 
@@ -12,11 +12,7 @@ This is responsible for tracking nzbs created by UD into a SQLite DB. On startup
 
 ### `ud-indexer`
 
-This is a simple web server that allows for searching and downloading of nzbs.
-
-### Prowlarr indexer definition
-
-See below for the YAML. This is what is configured in prowlarr.
+This is a Newznab-compatible API server that allows for searching and downloading of nzbs.
 
 ### `ud-blackhole`
 
@@ -66,6 +62,7 @@ ud-indexer:
     - NZBS_DIR=/nzbs
     - PUID=1000
     - PGID=1000
+    - INDEXER_BASE_URL=http://$LAN_IP:7990
   ports:
     - 7990:7990
   restart: always
@@ -87,83 +84,4 @@ ud-blackhole:
     - BLACKHOLE_SONARR_PATH=sonarr
     - BLACKHOLE_UD_MOUNT_PATH=/usenet-drive-crypt
   restart: always
-```
-
-## Prowlarr indexer
-
-Add this to Prowlarr's `Definitions/Custom`, and then add the indexer to prowlarr.
-
-```
----
-id: udindexer
-name: UD Indexer
-description: "Searches UD NZBs"
-language: en-US
-type: public
-encoding: UTF-8
-followredirect: false
-testlinktorrent: false
-requestDelay: 20
-links:
-  - http://$YOUR_IP:7990/
-caps:
-  categories:
-    Movies: Movies
-    TV: TV
-
-  modes:
-    search: [q]
-    movie-search: [q, imdbid]
-    tv-search: [q, imdbid, season]
-  allowrawsearch: false
-
-search:
-  headers:
-    User-Agent:
-      [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0",
-      ]
-  paths:
-    - path: "{{ if .Query.IMDBID }}search/movies/{{ .Query.IMDBID }}{{ else }}search/movies/title/{{ .Keywords }}{{ end }}"
-      method: get
-      response:
-        type: json
-        noResultsMessage: '"results": []'
-      categories: [Movies]
-    - path: "{{ if .Query.IMDBID }}search/shows/{{ .Query.IMDBID }}/{{ .Query.Season }}{{ else }}search/shows/title/{{ .Keywords }}{{ end }}"
-      method: get
-      response:
-        type: json
-        noResultsMessage: '"results": []'
-      categories: [TV]
-
-  rows:
-    selector: results
-    missingAttributeEqualsNoResults: true
-
-  fields:
-    title:
-      selector: name
-    category_is_tv_show:
-      text: "{{ .Result.title }}"
-      filters:
-        - name: regexp
-          args: "\\b(S\\d+(?:E\\d+)?)\\b"
-    category:
-      text: "{{ if .Result.category_is_tv_show }}TV{{ else }}Movies{{ end }}"
-    year:
-      selector: name
-      filters:
-        - name: regexp
-          args: "(\\b(19|20)\\d\\d\\b)"
-    size:
-      selector: raw_size
-      filters:
-        - name: append
-          args: "B"
-    download:
-      selector: filename
-      filters:
-        - name: prepend
-          args: "{{ .Config.sitelink }}download/"
 ```

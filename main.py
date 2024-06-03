@@ -178,10 +178,10 @@ def newznab_api():
   if function == "search":
     q = request.args.get('q')
     cats = request.args.get('cat')
-    if cats and 2000 in cats:
+    if cats and '2000' in cats and q:
       results = search_movies_with_title(q)
       return Response(construct_xml(results['results'], 2000), mimetype='application/xml')
-    if cats and 5000 in cats:
+    if cats and '5000' in cats and q:
       results = search_shows_with_title(q)
       return Response(construct_xml(results['results'], 5000), mimetype='application/xml')
 
