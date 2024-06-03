@@ -166,13 +166,17 @@ def newznab_api():
 
   if function == "tvsearch":
     imdb_id = request.args.get('imdbid')
+    if not imdb_id.startswith("tt"):
+      imdb_id = "tt" + imdb_id
     season = request.args.get('season')
-    results = search_shows_with_imdb("tt" + imdb_id, season)
+    results = search_shows_with_imdb(imdb_id, season)
     return Response(construct_xml(results['results'], 5000), mimetype='application/xml')
 
   if function == "movie":
     imdb_id = request.args.get('imdbid')
-    results = search_movies_with_imdb("tt" + imdb_id)
+    if not imdb_id.startswith("tt"):
+      imdb_id = "tt" + imdb_id
+    results = search_movies_with_imdb(imdb_id)
     return Response(construct_xml(results['results'], 2000), mimetype='application/xml')
 
   if function == "search":
